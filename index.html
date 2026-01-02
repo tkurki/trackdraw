@@ -491,6 +491,12 @@ Copyright 2025 Gabriel Nyman
                 </span>
                 <span class="btn-label">Locate</span>
             </button>
+            <button id="geoJsonBtn" class="toolbar-btn" aria-label="Import GeoJSON">
+                <span class="icon">
+                    <img src="icons/document--import.svg" alt="" aria-hidden="true" draggable="false">
+                </span>
+                <span class="btn-label">GeoJSON</span>
+            </button>
             <button id="shareBtn" class="toolbar-btn" aria-pressed="false" aria-label="Share drawing">
                 <span class="icon">
                     <img src="icons/export.svg" alt="" aria-hidden="true" draggable="false">
@@ -598,6 +604,8 @@ Copyright 2025 Gabriel Nyman
                 this.cachedCompressedDrawing = '';
                 this.drawingSerializationDirty = true;
                 this.compressInFlight = null;
+                this.compressionGeneration = 0;
+                this.isLoadingFromUrl = false;
                 this.colorPalette = [
                     '#FF3B30', '#FF9500', '#FFCC00', '#4CD964',
                     '#5AC8FA', '#007AFF', '#5856D6', '#AF52DE',
@@ -739,6 +747,7 @@ Copyright 2025 Gabriel Nyman
 
                 // Action buttons
                 this.locationButton = attachButton('locationBtn', () => this.goToLocation());
+                attachButton('geoJsonBtn', () => this.importGeoJSON());
                 this.shareButton = attachButton('shareBtn', () => this.showShare());
                 this.clearButton = attachButton('clearBtn', () => this.clearDrawing());
                 this.undoButton = attachButton('undoBtn', () => this.undo());
@@ -1188,6 +1197,123 @@ Copyright 2025 Gabriel Nyman
                 this.updateUrl();
                 this.scheduleAutoSave();
                 this.showStatus('Drawing cleared', 'success', this.clearButton);
+            }
+
+            importGeoJSON() {
+                const input = prompt('Paste GeoJSON (LineString or MultiLineString):');
+                if (!input) return;
+
+                try {
+                    const geojson = JSON.parse(input);
+                    this.loadGeoJSON(geojson);
+                } catch (error) {
+                    console.error('Failed to parse GeoJSON:', error);
+                    this.showStatus('Invalid GeoJSON format', 'error');
+                }
+            }
+
+            loadGeoJSON(geojson) {
+                let features = [];
+                
+                // Handle different GeoJSON structures
+                if (geojson.type === 'FeatureCollection') {
+                    features = geojson.features;
+                } else if (geojson.type === 'Feature') {
+                    features = [geojson];
+                } else if (geojson.type === 'LineString' || geojson.type === 'MultiLineString') {
+                    features = [{ type: 'Feature', geometry: geojson }];
+                } else {
+                    this.showStatus('Unsupported GeoJSON type. Use LineString or MultiLineString.', 'error');
+                    return;
+                }
+
+                this.captureUndoSnapshot();
+                let addedPaths = 0;
+                let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+
+                features.forEach(feature => {
+                    const geometry = feature.geometry || feature;
+                    if (!geometry || !geometry.coordinates) return;
+
+                    if (geometry.type === 'LineString') {
+                        const points = geometry.coordinates.map(coord => ({
+                            lat: coord[1],
+                            lng: coord[0]
+                        }));
+                        
+                        if (points.length >= 2) {
+                            points.forEach(p => {
+                                minLat = Math.min(minLat, p.lat);
+                                maxLat = Math.max(maxLat, p.lat);
+                                minLng = Math.min(minLng, p.lng);
+                                maxLng = Math.max(maxLng, p.lng);
+                            });
+                            
+                            this.paths.push({
+                                points,
+                                strokeWidth: this.currentStroke,
+                                type: 'line',
+                                colorIndex: this.currentColorIndex
+                            });
+                            addedPaths++;
+                        }
+                    } else if (geometry.type === 'MultiLineString') {
+                        geometry.coordinates.forEach(lineCoords => {
+                            const points = lineCoords.map(coord => ({
+                                lat: coord[1],
+                                lng: coord[0]
+                            }));
+                            
+                            if (points.length >= 2) {
+                                points.forEach(p => {
+                                    minLat = Math.min(minLat, p.lat);
+                                    maxLat = Math.max(maxLat, p.lat);
+                                    minLng = Math.min(minLng, p.lng);
+                                    maxLng = Math.max(maxLng, p.lng);
+                                });
+                                
+                                this.paths.push({
+                                    points,
+                                    strokeWidth: this.currentStroke,
+                                    type: 'line',
+                                    colorIndex: this.currentColorIndex
+                                });
+                                addedPaths++;
+                            }
+                        });
+                    }
+                });
+
+                if (addedPaths > 0) {
+                    this.markPathsMutated();
+                    this.commitUndoSnapshot();
+                    this.redrawPaths();
+                    
+                    // Zoom to fit the imported lines
+                    if (Number.isFinite(minLat) && Number.isFinite(maxLat)) {
+                        const centerLat = (minLat + maxLat) / 2;
+                        const centerLng = (minLng + maxLng) / 2;
+                        const latDiff = maxLat - minLat;
+                        const lngDiff = maxLng - minLng;
+                        
+                        // Calculate appropriate zoom level
+                        const maxDiff = Math.max(latDiff, lngDiff);
+                        let zoom = 13;
+                        if (maxDiff < 0.001) zoom = 18;
+                        else if (maxDiff < 0.01) zoom = 15;
+                        else if (maxDiff < 0.1) zoom = 12;
+                        else if (maxDiff < 1) zoom = 9;
+                        else zoom = 7;
+                        
+                        this.map.setView([centerLat, centerLng], zoom);
+                    }
+                    
+                    this.updateUrl();
+                    this.scheduleAutoSave();
+                    this.showStatus(`Imported ${addedPaths} line${addedPaths > 1 ? 's' : ''}`, 'success');
+                } else {
+                    this.showStatus('No valid LineString or MultiLineString found', 'error');
+                }
             }
 
             goToLocation() {
@@ -1997,6 +2123,7 @@ Copyright 2025 Gabriel Nyman
                     const inflated = window.UZIP.inflateRaw(compressedBytes);
                     const binary = inflated instanceof Uint8Array ? inflated : new Uint8Array(inflated);
                     const paths = this.decodePathsFromBinary(binary);
+                    console.log(paths)
 
                     this.paths = paths;
                     this.undoStack = [];
@@ -2045,9 +2172,13 @@ Copyright 2025 Gabriel Nyman
                             }
                             break;
                         case 'arrow':
-                        case 'line':
                             if (path.points && path.points.length >= 2) {
                                 pathData = this.latLngsToPathData(path.points.slice(0, 2));
+                            }
+                            break;
+                        case 'line':
+                            if (path.points && path.points.length >= 2) {
+                                pathData = this.latLngsToPathData(path.points);
                             }
                             break;
                     }
@@ -2064,6 +2195,11 @@ Copyright 2025 Gabriel Nyman
             }
 
             async updateUrl() {
+                // Don't update URL while loading from URL to preserve the drawing parameter
+                if (this.isLoadingFromUrl) {
+                    return;
+                }
+                
                 try {
                     const center = this.map.getCenter();
                     const zoom = this.map.getZoom();
@@ -2114,6 +2250,13 @@ Copyright 2025 Gabriel Nyman
                     const zoom = zoomStr ? parseInt(zoomStr) : undefined;
                     const drawing = params.get('d') || params.get('drawing');
                     
+                    // Preserve drawing data immediately to prevent URL updates from losing it
+                    if (drawing) {
+                        this.isLoadingFromUrl = true;
+                        this.cachedCompressedDrawing = drawing;
+                        this.drawingSerializationDirty = false;
+                    }
+                    
                     if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(zoom)) {
                         this.map.setView([lat, lng], zoom);
                     } else if (Number.isFinite(lat) && Number.isFinite(lng)) {
@@ -2123,10 +2266,12 @@ Copyright 2025 Gabriel Nyman
                     if (drawing) {
                         setTimeout(() => {
                             this.decompressDrawing(drawing);
+                            this.isLoadingFromUrl = false;
                         }, 200);
                     }
                 } catch (e) {
                     console.error('Failed to load from URL:', e);
+                    this.isLoadingFromUrl = false;
                 }
             }
 
