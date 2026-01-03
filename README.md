@@ -1,6 +1,7 @@
-# mapdraw
-simple static html page showing a map that you can draw on, and then share the drawing, all client side
+# trackdraw
+Simple static html page showing a map that you can draw on, and then share the drawing, all client side. Suitable for example for displaying vessel GPS/GNSS tracks.
 
 
 # demo
-[https://nyman.re/mapdraw/#l=60.172108%2C24.941458&z=16&d=LU8xSyNhFJz57h...](https://nyman.re/mapdraw/#l=60.172108%2C24.941458&z=16&d=LU8xSyNhFJz57hLD3e13gctmi900d9uYFY5UXtJcdWSb5RqTJmW2sdxtRBsXQRRBCahVQhARQd0iNhb5A64iViKpBHHxB4iFFoJfVGbeq2bmvRHZjtjbPK5Gd6lx93kwkZ9dOzquxgepcUDLw3-0MIsVosvxniu3fc_13ErTbGrh91DrM5NwIiV2BCKBeyIhYiKEC0vDNDwEH_Ztyi5r2_wz15yvBeVgqmU15D84chK_FCZhQoNdK4flmHZCe0lYfSETURwJ2RHFaxZ85FF6k5XUvMOUTq4uG8WgEBQbsiGnc07WVOf7RI_qPcUfoe6bru5qli7fTToq5t9Tts5Y7_J3u-RktBnoX6PnQfX-KDWeqPXGLaw91rYoF9DET-RQ0fRvVy-D6v5uathDgSHxSCwJJALnAg_EiIg4bq6EKuvkJjVWeZHJxpw6pD3kuJlih9YGC2Heh9S_XKrEw9vUqI8-BTGXGXOdPS522I7o-Y6bsV4B)
+
+https://tkurki.github.io/trackdraw/#l=59.885462%2C23.311007&z=12&d=AWQAm_8CA1AM-NKTOdivohaJigLOCtG_AYeoBPY3y4MDu4oB-VS9ogGB3wGdRbCzA6c17cMCm4UByl_TeqyPAf9Hj9kCgegB3D_WAozijjmSvKEWq5EBl5kFnwKgm5I5zNugFvdwnIwC
