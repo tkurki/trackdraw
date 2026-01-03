@@ -1,5 +1,5 @@
 # trackdraw
-Simple static html page showing a map that you can draw on, and then share the drawing, all client side. Suitable for example for displaying vessel GPS/GNSS tracks.
+Simple static html page showing a map that you can draw on, and then share the drawing, all client side. Suitable for example for displaying vessel GPS/GNSS tracks, just import your track as GeoJSON MultiLineString or LineString.
 
 
 # demo
